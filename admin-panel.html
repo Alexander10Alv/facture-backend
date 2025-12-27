@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin - Whitelist</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .login-box, .main-content {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .login-box {
+      max-width: 400px;
+      margin: 100px auto;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #333;
+      font-weight: 600;
+    }
+    
+    input[type="password"],
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    button:hover {
+      background: #5568d3;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .btn-danger {
+      background: #ef4444;
+    }
+    
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    
+    .add-form {
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    
+    .add-form h2 {
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 18px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    tr:hover {
+      background: #f9fafb;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .alert-success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    
+    .alert-error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Login Box -->
+  <div id="loginBox" class="login-box">
+    <h1 style="text-align: center; margin-bottom: 20px;">🔐 Panel Admin</h1>
+    <div id="loginError" class="alert alert-error hidden"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="password">Contraseña:</label>
+        <input type="password" id="password" required>
+      </div>
+      <button type="submit" style="width: 100%;">Ingresar</button>
+    </form>
+  </div>
+  
+  <!-- Main Content -->
+  <div id="mainContent" class="hidden">
+    <div class="container">
+      <div class="header">
+        <h1>🎁 Gestión de Whitelist</h1>
+        <p class="subtitle">Tiendas con acceso gratuito a la app</p>
+      </div>
+      
+      <div class="main-content">
+        <div id="alert" class="hidden"></div>
+        
+        <!-- Formulario para agregar -->
+        <div class="add-form">
+          <h2>➕ Agregar Nueva Tienda</h2>
+          <form id="addForm">
+            <div class="form-group">
+              <label for="shopDomain">Dominio de la tienda: *</label>
+              <input 
+                type="text" 
+                id="shopDomain" 
+                placeholder="ejemplo.myshopify.com" 
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="reason">Razón (opcional):</label>
+              <input 
+                type="text" 
+                id="reason" 
+                placeholder="Cliente VIP, Prueba, etc."
+              >
+            </div>
+            <button type="submit">Agregar al Whitelist</button>
+          </form>
+        </div>
+        
+        <!-- Tabla de tiendas -->
+        <div id="tableContainer">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let authToken = null;
+    const API_URL = window.location.origin;
+    
+    // Login
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      
+      // Intentar hacer una petición con el token
+      try {
+        const response = await fetch(`${API_URL}/api/whitelist`, {
+          headers: {
+            'Authorization': `Bearer ${password}`
+          }
+        });
+        
+        if (response.ok) {
+          authToken = password;
+          document.getElementById('loginBox').classList.add('hidden');
+          document.getElementById('mainContent').classList.remove('hidden');
+          loadWhitelist();
+        } else {
+          showLoginError('Contraseña incorrecta');
+        }
+      } catch (error) {
+        showLoginError('Error de conexión');
+      }
+    });
+    
+    function showLoginError(message) {
+      const errorDiv = document.getElementById('loginError');
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+      setTimeout(() => errorDiv.classList.add('hidden'), 3000);
+    }
+    
+    // Cargar whitelist
+    async function loadWhitelist() {
+      const container = document.getElementById('tableContainer');
+      container.innerHTML = '<div class="loading">Cargando...</div>';
+      
+      try {
+        const response = await fetch(`${API_URL}/api/whitelist`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.data.length > 0) {
+          renderTable(data.data);
+        } else {
+          container.innerHTML = `
+            <div class="empty-state">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+              </svg>
+              <h3>No hay tiendas en el whitelist</h3>
+              <p>Agrega la primera tienda usando el formulario de arriba</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        showAlert('Error cargando datos: ' + error.message, 'error');
+      }
+    }
+    
+    function renderTable(data) {
+      const html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Tienda</th>
+              <th>Razón</th>
+              <th>Agregado por</th>
+              <th>Fecha</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(row => `
+              <tr>
+                <td><strong>${row.shop_domain}</strong></td>
+                <td>${row.reason || '-'}</td>
+                <td><span class="badge badge-success">${row.added_by}</span></td>
+                <td>${new Date(row.created_at).toLocaleDateString('es-ES')}</td>
+                <td>
+                  <button class="btn-danger" onclick="deleteShop(${row.id}, '${row.shop_domain}')">
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById('tableContainer').innerHTML = html;
+    }
+    
+    // Agregar tienda
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const shopDomain = document.getElementById('shopDomain').value.trim();
+      const reason = document.getElementById('reason').value.trim();
+      
+      try {
+        const response = await fetch(`${API_URL}/api/whitelist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ shop_domain: shopDomain, reason })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showAlert('✅ Tienda agregada exitosamente', 'success');
+          document.getElementById('addForm').reset();
+          loadWhitelist();
+        } else {
+          showAlert('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showAlert('❌ Error: ' + error.message, 'error');
+      }
+    });
+    
+    // Eliminar tienda
+    async function deleteShop(id, shopDomain) {
+      if (!confirm(`¿Eliminar "${shopDomain}" del whitelist?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/api/whitelist/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showAlert('✅ Tienda eliminada', 'success');
+          loadWhitelist();
+        } else {
+          showAlert('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showAlert('❌ Error: ' + error.message, 'error');
+      }
+    }
+    
+    function showAlert(message, type) {
+      const alertDiv = document.getElementById('alert');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+      alertDiv.classList.remove('hidden');
+      setTimeout(() => alertDiv.classList.add('hidden'), 5000);
+    }
+  </script>
+</body>
+</html>

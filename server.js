@@ -73,16 +73,19 @@ app.get('/install', async (req, res) => {
 });
 
 // ============================================
-// WHITELIST DE TIENDAS GRATUITAS
+// WHITELIST DE TIENDAS GRATUITAS (Desde BD)
 // ============================================
-const WHITELIST = [
-  'systemperuplus.myshopify.com', // Tu tienda de prueba
-  'integration-lioren.myshopify.com', // Tienda del cliente
-  // Agrega más tiendas aquí
-];
-
-function isWhitelisted(shop) {
-  return WHITELIST.includes(shop);
+async function isWhitelisted(shop) {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id FROM whitelist WHERE shop_domain = ?',
+      [shop]
+    );
+    return rows.length > 0;
+  } catch (error) {
+    console.error('Error verificando whitelist:', error);
+    return false;
+  }
 }
 
 // ============================================
@@ -120,7 +123,8 @@ app.get('/callback', async (req, res) => {
     // ============================================
     // VERIFICAR WHITELIST
     // ============================================
-    if (isWhitelisted(shop)) {
+    const whitelisted = await isWhitelisted(shop);
+    if (whitelisted) {
       console.log('🎁 Tienda en WHITELIST - Acceso gratuito');
       
       // Actualizar como plan gratuito
@@ -207,7 +211,110 @@ app.get('/test-db', async (req, res) => {
   }
 });
 
+// ============================================
+// PANEL DE ADMINISTRACIÓN - WHITELIST
+// ============================================
+
+// Middleware de autenticación simple
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  
+  const token = authHeader.substring(7);
+  
+  if (token !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Contraseña incorrecta' });
+  }
+  
+  next();
+}
+
+// Servir panel HTML
+app.get('/admin/whitelist', (req, res) => {
+  res.sendFile(__dirname + '/admin-panel.html');
+});
+
+// API: Listar tiendas whitelisted
+app.get('/api/whitelist', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, shop_domain, reason, added_by, created_at, updated_at FROM whitelist ORDER BY created_at DESC'
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error obteniendo whitelist:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// API: Agregar tienda a whitelist
+app.post('/api/whitelist', requireAuth, async (req, res) => {
+  try {
+    const { shop_domain, reason } = req.body;
+    
+    if (!shop_domain) {
+      return res.status(400).json({ success: false, error: 'shop_domain es requerido' });
+    }
+    
+    // Validar formato
+    if (!shop_domain.endsWith('.myshopify.com')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'El dominio debe terminar en .myshopify.com' 
+      });
+    }
+    
+    await pool.execute(
+      'INSERT INTO whitelist (shop_domain, reason, added_by) VALUES (?, ?, ?)',
+      [shop_domain, reason || 'Sin razón especificada', 'admin']
+    );
+    
+    // Si la tienda ya existe en subscriptions, actualizar a plan gratuito
+    await pool.execute(
+      `UPDATE subscriptions 
+       SET subscription_status = 'active', plan_type = 'free', updated_at = NOW()
+       WHERE shop_domain = ?`,
+      [shop_domain]
+    );
+    
+    res.json({ success: true, message: 'Tienda agregada al whitelist' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ success: false, error: 'La tienda ya está en el whitelist' });
+    }
+    console.error('Error agregando a whitelist:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// API: Eliminar tienda de whitelist
+app.delete('/api/whitelist/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [result] = await pool.execute(
+      'DELETE FROM whitelist WHERE id = ?',
+      [id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Tienda no encontrada' });
+    }
+    
+    res.json({ success: true, message: 'Tienda eliminada del whitelist' });
+  } catch (error) {
+    console.error('Error eliminando de whitelist:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Backend corriendo en puerto ${PORT}`);
   console.log(`📍 URL: ${process.env.HOST}`);
+  console.log(`🔐 Panel admin: ${process.env.HOST}/admin/whitelist`);
 });
