@@ -297,16 +297,87 @@ app.delete('/api/whitelist/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const [result] = await pool.execute(
-      'DELETE FROM whitelist WHERE id = ?',
+    // Obtener info de la tienda antes de eliminar
+    const [whitelistRows] = await pool.execute(
+      'SELECT shop_domain FROM whitelist WHERE id = ?',
       [id]
     );
     
-    if (result.affectedRows === 0) {
+    if (whitelistRows.length === 0) {
       return res.status(404).json({ success: false, error: 'Tienda no encontrada' });
     }
     
-    res.json({ success: true, message: 'Tienda eliminada del whitelist' });
+    const shopDomain = whitelistRows[0].shop_domain;
+    
+    // Eliminar del whitelist
+    await pool.execute('DELETE FROM whitelist WHERE id = ?', [id]);
+    
+    // Verificar si la tienda tiene la app instalada
+    const [shopRows] = await pool.execute(
+      'SELECT access_token, subscription_status, plan_type FROM subscriptions WHERE shop_domain = ?',
+      [shopDomain]
+    );
+    
+    if (shopRows.length === 0 || !shopRows[0].access_token) {
+      return res.json({ 
+        success: true, 
+        message: 'Tienda eliminada del whitelist (no tenía la app instalada)' 
+      });
+    }
+    
+    const { access_token, subscription_status, plan_type } = shopRows[0];
+    
+    // Verificar si tiene suscripción pagada activa
+    const hasPaidSubscription = subscription_status === 'active' && plan_type === 'paid';
+    
+    if (hasPaidSubscription) {
+      return res.json({ 
+        success: true, 
+        message: 'Tienda eliminada del whitelist. La app sigue instalada porque tiene suscripción pagada activa.' 
+      });
+    }
+    
+    // No tiene suscripción pagada → Desinstalar la app
+    try {
+      const revokeUrl = `https://${shopDomain}/admin/api_permissions/current.json`;
+      
+      const response = await fetch(revokeUrl, {
+        method: 'DELETE',
+        headers: {
+          'X-Shopify-Access-Token': access_token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        // Limpiar access token de la BD
+        await pool.execute(
+          'UPDATE subscriptions SET access_token = NULL, subscription_status = "uninstalled", updated_at = NOW() WHERE shop_domain = ?',
+          [shopDomain]
+        );
+        
+        console.log(`✅ App desinstalada remotamente de ${shopDomain}`);
+        
+        return res.json({ 
+          success: true, 
+          message: 'Tienda eliminada del whitelist y app desinstalada. Si quieren reinstalar, deberán suscribirse.' 
+        });
+      } else {
+        console.warn(`⚠️ No se pudo desinstalar app de ${shopDomain}: ${response.status}`);
+        return res.json({ 
+          success: true, 
+          message: 'Tienda eliminada del whitelist pero no se pudo desinstalar la app automáticamente. Desinstálala manualmente desde Shopify Admin.' 
+        });
+      }
+    } catch (uninstallError) {
+      console.error('Error desinstalando app:', uninstallError);
+      return res.json({ 
+        success: true, 
+        message: 'Tienda eliminada del whitelist pero hubo un error al desinstalar la app. Desinstálala manualmente.' 
+      });
+    }
+    
   } catch (error) {
     console.error('Error eliminando de whitelist:', error);
     res.status(500).json({ success: false, error: error.message });
