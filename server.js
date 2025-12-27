@@ -77,6 +77,7 @@ app.get('/install', async (req, res) => {
 // ============================================
 const WHITELIST = [
   'systemperuplus.myshopify.com', // Tu tienda de prueba
+  'integration-lioren.myshopify.com', // Tienda del cliente
   // Agrega más tiendas aquí
 ];
 
