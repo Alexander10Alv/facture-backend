@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const mysql = require('mysql2/promise');
 const { shopifyApi, LATEST_API_VERSION } = require('@shopify/shopify-api');
 require('@shopify/shopify-api/adapters/node');
@@ -215,10 +216,22 @@ app.get('/test-db', async (req, res) => {
 // PANEL DE ADMINISTRACIÓN - WHITELIST
 // ============================================
 
-// Middleware de autenticación simple
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+// Función para obtener contraseña de la BD
+async function getAdminPassword() {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT setting_value FROM admin_settings WHERE setting_key = ?',
+      ['admin_password']
+    );
+    return rows.length > 0 ? rows[0].setting_value : null;
+  } catch (error) {
+    console.error('Error obteniendo contraseña:', error);
+    return null;
+  }
+}
 
-function requireAuth(req, res, next) {
+// Middleware de autenticación
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -226,8 +239,16 @@ function requireAuth(req, res, next) {
   }
   
   const token = authHeader.substring(7);
+  const storedPassword = await getAdminPassword();
   
-  if (token !== ADMIN_PASSWORD) {
+  if (!storedPassword) {
+    return res.status(500).json({ error: 'Error de configuración' });
+  }
+  
+  // Comparar con bcrypt
+  const isValid = await bcrypt.compare(token, storedPassword);
+  
+  if (!isValid) {
     return res.status(401).json({ error: 'Contraseña incorrecta' });
   }
   
@@ -380,6 +401,58 @@ app.delete('/api/whitelist/:id', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('Error eliminando de whitelist:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// API: Cambiar contraseña del admin
+app.post('/api/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Se requieren contraseña actual y nueva' 
+      });
+    }
+    
+    if (newPassword.length < 8) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'La nueva contraseña debe tener al menos 8 caracteres' 
+      });
+    }
+    
+    // Verificar contraseña actual
+    const storedPassword = await getAdminPassword();
+    const isValid = await bcrypt.compare(currentPassword, storedPassword);
+    
+    if (!isValid) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Contraseña actual incorrecta' 
+      });
+    }
+    
+    // Hashear nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Actualizar en BD
+    await pool.execute(
+      'UPDATE admin_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?',
+      [hashedPassword, 'admin_password']
+    );
+    
+    console.log('✅ Contraseña de admin actualizada');
+    
+    res.json({ 
+      success: true, 
+      message: 'Contraseña actualizada exitosamente' 
+    });
+    
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

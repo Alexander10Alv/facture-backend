@@ -226,6 +226,43 @@
       <div class="main-content">
         <div id="alert" class="hidden"></div>
         
+        <!-- Sección de cambio de contraseña -->
+        <div class="add-form" style="margin-bottom: 30px;">
+          <h2>🔐 Cambiar Contraseña</h2>
+          <form id="changePasswordForm">
+            <div class="form-group">
+              <label for="currentPassword">Contraseña actual: *</label>
+              <input 
+                type="password" 
+                id="currentPassword" 
+                required
+                autocomplete="current-password"
+              >
+            </div>
+            <div class="form-group">
+              <label for="newPassword">Nueva contraseña: * (mínimo 8 caracteres)</label>
+              <input 
+                type="password" 
+                id="newPassword" 
+                required
+                minlength="8"
+                autocomplete="new-password"
+              >
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirmar nueva contraseña: *</label>
+              <input 
+                type="password" 
+                id="confirmPassword" 
+                required
+                minlength="8"
+                autocomplete="new-password"
+              >
+            </div>
+            <button type="submit">Cambiar Contraseña</button>
+          </form>
+        </div>
+        
         <!-- Formulario para agregar -->
         <div class="add-form">
           <h2>➕ Agregar Nueva Tienda</h2>
@@ -383,6 +420,53 @@
           showAlert('✅ Tienda agregada exitosamente', 'success');
           document.getElementById('addForm').reset();
           loadWhitelist();
+        } else {
+          showAlert('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showAlert('❌ Error: ' + error.message, 'error');
+      }
+    });
+    
+    // Cambiar contraseña
+    document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      
+      if (newPassword !== confirmPassword) {
+        showAlert('❌ Las contraseñas no coinciden', 'error');
+        return;
+      }
+      
+      if (newPassword.length < 8) {
+        showAlert('❌ La contraseña debe tener al menos 8 caracteres', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/api/change-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ 
+            currentPassword: currentPassword,
+            newPassword: newPassword 
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showAlert('✅ Contraseña actualizada. Usa la nueva contraseña en tu próximo inicio de sesión.', 'success');
+          document.getElementById('changePasswordForm').reset();
+          
+          // Actualizar el token para futuras peticiones
+          authToken = newPassword;
         } else {
           showAlert('❌ ' + data.error, 'error');
         }

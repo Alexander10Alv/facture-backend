@@ -31,7 +31,7 @@ node server.js
 Abre en tu navegador:
 
 ```
-https://srv1090335.hstgr.cloud/admin/whitelist
+https://facture.bigstudio.cl/admin/whitelist
 ```
 
 Ingresa la contraseña que configuraste en el `.env`
