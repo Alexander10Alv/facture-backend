@@ -226,8 +226,18 @@
       <div class="main-content">
         <div id="alert" class="hidden"></div>
         
-        <!-- Sección de cambio de contraseña -->
-        <div class="add-form" style="margin-bottom: 30px;">
+        <!-- Sección de cambio de contraseña (colapsable) -->
+        <div style="margin-bottom: 20px;">
+          <button 
+            id="togglePasswordBtn" 
+            style="background: #6366f1; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: auto;"
+            onclick="document.getElementById('passwordSection').classList.toggle('hidden'); this.textContent = this.textContent.includes('▼') ? '▲ Ocultar Cambio de Contraseña' : '▼ Cambiar Contraseña';"
+          >
+            ▼ Cambiar Contraseña
+          </button>
+        </div>
+        
+        <div id="passwordSection" class="add-form hidden" style="margin-bottom: 30px;">
           <h2>🔐 Cambiar Contraseña</h2>
           <form id="changePasswordForm">
             <div class="form-group">
